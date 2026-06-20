@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f7a6d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="五十音練習">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>日語五十音練習</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="settings" aria-labelledby="settings-title">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">Kana Practice</p>
+            <h1 id="settings-title">日語五十音練習</h1>
+          </div>
+          <div class="score" aria-live="polite">
+            <span id="progressText">0 / 0</span>
+            <strong id="scoreText">0%</strong>
+          </div>
+        </div>
+
+        <div class="controls">
+          <fieldset>
+            <legend>練習模式</legend>
+            <label>
+              <input type="radio" name="mode" value="kana-to-romaji" checked>
+              假名選發音
+            </label>
+            <label>
+              <input type="radio" name="mode" value="romaji-to-kana">
+              發音選假名
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>假名系統</legend>
+            <label>
+              <input type="radio" name="script" value="hiragana" checked>
+              平假名
+            </label>
+            <label>
+              <input type="radio" name="script" value="katakana">
+              片假名
+            </label>
+            <label>
+              <input type="radio" name="script" value="mixed">
+              混合
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>題目範圍</legend>
+            <label>
+              <input type="checkbox" name="category" value="basic" checked>
+              清音
+            </label>
+            <label>
+              <input type="checkbox" name="category" value="dakuten" checked>
+              濁音
+            </label>
+            <label>
+              <input type="checkbox" name="category" value="handakuten" checked>
+              半濁音
+            </label>
+            <label>
+              <input type="checkbox" name="category" value="yoon" checked>
+              拗音
+            </label>
+          </fieldset>
+
+          <label class="select-label">
+            題數
+            <select id="questionCount">
+              <option value="10">10 題</option>
+              <option value="20" selected>20 題</option>
+              <option value="50">50 題</option>
+            </select>
+          </label>
+        </div>
+
+        <button id="startButton" class="primary-button" type="button">開始練習</button>
+      </section>
+
+      <section class="quiz" aria-live="polite">
+        <div class="quiz-top">
+          <span id="categoryText">選擇設定後開始</span>
+          <button id="replayButton" class="ghost-button" type="button" disabled>重播發音</button>
+        </div>
+
+        <div class="prompt-wrap">
+          <p id="promptLabel" class="prompt-label">題目</p>
+          <div id="promptText" class="prompt">---</div>
+        </div>
+
+        <div id="options" class="options" aria-label="選項"></div>
+
+        <div class="feedback">
+          <p id="feedbackText">開始後會在這裡顯示答題結果。</p>
+          <button id="nextButton" class="primary-button" type="button" hidden>下一題</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
