@@ -34,6 +34,60 @@ const categoryNames = {
   yoon: "拗音"
 };
 
+const chartLayouts = {
+  basic: {
+    columns: ["a", "i", "u", "e", "o"],
+    rowLabels: ["a", "k", "g", "s", "z", "t", "d", "n", "h", "b", "p", "m", "y", "r", "w", "n"],
+    rowCategories: [
+      "basic", "basic", "dakuten", "basic", "dakuten", "basic", "dakuten", "basic",
+      "basic", "dakuten", "handakuten", "basic", "basic", "basic", "basic", "basic"
+    ],
+    rows: [
+      ["a", "i", "u", "e", "o"],
+      ["ka", "ki", "ku", "ke", "ko"],
+      ["ga", "gi", "gu", "ge", "go"],
+      ["sa", "shi", "su", "se", "so"],
+      ["za", "ji", "zu", "ze", "zo"],
+      ["ta", "chi", "tsu", "te", "to"],
+      ["da", "ji", "zu", "de", "do"],
+      ["na", "ni", "nu", "ne", "no"],
+      ["ha", "hi", "fu", "he", "ho"],
+      ["ba", "bi", "bu", "be", "bo"],
+      ["pa", "pi", "pu", "pe", "po"],
+      ["ma", "mi", "mu", "me", "mo"],
+      ["ya", null, "yu", null, "yo"],
+      ["ra", "ri", "ru", "re", "ro"],
+      ["wa", null, null, null, "wo"],
+      ["n", null, null, null, null]
+    ]
+  },
+  dakuten: {
+    columns: ["a", "i", "u", "e", "o"],
+    rowLabels: ["g", "z", "d", "b"],
+    rows: [
+      ["ga", "gi", "gu", "ge", "go"],
+      ["za", "ji", "zu", "ze", "zo"],
+      ["da", "ji", "zu", "de", "do"],
+      ["ba", "bi", "bu", "be", "bo"]
+    ]
+  },
+  handakuten: {
+    columns: ["a", "i", "u", "e", "o"],
+    rowLabels: ["p"],
+    rows: [["pa", "pi", "pu", "pe", "po"]]
+  },
+  yoon: {
+    columns: ["ya", "yu", "yo"],
+    rowLabels: ["ky", "sh", "ch", "ny", "hy", "my", "ry", "gy", "j", "by", "py"],
+    rows: [
+      ["kya", "kyu", "kyo"], ["sha", "shu", "sho"], ["cha", "chu", "cho"],
+      ["nya", "nyu", "nyo"], ["hya", "hyu", "hyo"], ["mya", "myu", "myo"],
+      ["rya", "ryu", "ryo"], ["gya", "gyu", "gyo"], ["ja", "ju", "jo"],
+      ["bya", "byu", "byo"], ["pya", "pyu", "pyo"]
+    ]
+  }
+};
+
 const state = {
   questions: [],
   currentIndex: 0,
@@ -55,7 +109,13 @@ const elements = {
   categoryText: document.querySelector("#categoryText"),
   progressText: document.querySelector("#progressText"),
   scoreText: document.querySelector("#scoreText"),
-  questionCount: document.querySelector("#questionCount")
+  questionCount: document.querySelector("#questionCount"),
+  practiceTab: document.querySelector("#practiceTab"),
+  chartTab: document.querySelector("#chartTab"),
+  practiceView: document.querySelector("#practiceView"),
+  chartView: document.querySelector("#chartView"),
+  kanaTables: document.querySelector("#kanaTables"),
+  chartStatus: document.querySelector("#chartStatus")
 };
 
 function getSelectedValue(name) {
@@ -130,19 +190,131 @@ function loadVoices() {
   state.japaneseVoice = voices.find((voice) => voice.lang === "ja-JP") || voices.find((voice) => voice.lang.startsWith("ja")) || null;
 }
 
-function speakCurrentAnswer() {
-  if (!window.speechSynthesis || !state.currentAnswer) {
-    elements.feedbackText.textContent += " 這個瀏覽器不支援語音播放。";
-    return;
-  }
-
+function speakKana(item, onEnd) {
+  if (!window.speechSynthesis || !item) return false;
   speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(state.currentAnswer.hiragana);
+  const utterance = new SpeechSynthesisUtterance(item.hiragana);
   utterance.lang = "ja-JP";
   utterance.rate = 0.82;
   utterance.pitch = 1;
   if (state.japaneseVoice) utterance.voice = state.japaneseVoice;
+  if (onEnd) {
+    utterance.addEventListener("end", onEnd);
+    utterance.addEventListener("error", onEnd);
+  }
   speechSynthesis.speak(utterance);
+  return true;
+}
+
+function speakCurrentAnswer() {
+  if (!speakKana(state.currentAnswer)) {
+    elements.feedbackText.textContent += " 這個瀏覽器不支援語音播放。";
+  }
+}
+
+function switchView(viewName) {
+  const showPractice = viewName === "practice";
+  elements.practiceView.hidden = !showPractice;
+  elements.chartView.hidden = showPractice;
+  elements.practiceTab.classList.toggle("active", showPractice);
+  elements.chartTab.classList.toggle("active", !showPractice);
+  elements.practiceTab.setAttribute("aria-selected", String(showPractice));
+  elements.chartTab.setAttribute("aria-selected", String(!showPractice));
+}
+
+function findChartItem(category, romaji, usedItems) {
+  const item = kanaData.find((candidate) =>
+    candidate.category === category &&
+    candidate.romaji === romaji &&
+    !usedItems.has(candidate)
+  );
+  if (item) usedItems.add(item);
+  return item;
+}
+
+function renderKanaTables() {
+  for (const [category, layout] of Object.entries(chartLayouts)) {
+    if (category === "dakuten" || category === "handakuten") continue;
+
+    const section = document.createElement("section");
+    section.className = "kana-section";
+
+    const heading = document.createElement("h3");
+    heading.textContent = category === "basic" ? "清音・濁音・半濁音" : categoryNames[category];
+    section.append(heading);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "kana-table-wrap";
+
+    const table = document.createElement("table");
+    table.className = `kana-table${category === "yoon" ? " yoon-table" : ""}`;
+    table.setAttribute("aria-label", `${categoryNames[category]}假名表`);
+
+    const header = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    const corner = document.createElement("th");
+    corner.className = "row-heading";
+    corner.setAttribute("aria-label", "行");
+    headerRow.append(corner);
+    for (const column of layout.columns) {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = column;
+      headerRow.append(cell);
+    }
+    header.append(headerRow);
+    table.append(header);
+
+    const body = document.createElement("tbody");
+    const usedItems = new Set();
+    for (const [rowIndex, row] of layout.rows.entries()) {
+      const tableRow = document.createElement("tr");
+      const rowCategory = layout.rowCategories?.[rowIndex] || category;
+      const rowLabel = layout.rowLabels[rowIndex];
+      if (rowCategory !== "basic") tableRow.className = `${rowCategory}-row`;
+      const rowHeading = document.createElement("th");
+      rowHeading.className = "row-heading";
+      rowHeading.scope = "row";
+      rowHeading.textContent = rowLabel;
+      tableRow.append(rowHeading);
+      for (const romaji of row) {
+        const cell = document.createElement("td");
+        const item = romaji ? findChartItem(rowCategory, romaji, usedItems) : null;
+        if (item) {
+          const button = document.createElement("button");
+          button.className = "kana-cell";
+          button.type = "button";
+          button.setAttribute("aria-label", `${item.hiragana}、${item.katakana}，${item.romaji}，播放發音`);
+          button.innerHTML = `
+            <span class="kana-pair">
+              <span class="kana-symbol hiragana">${item.hiragana}</span>
+              <span class="kana-symbol katakana">${item.katakana}</span>
+            </span>
+            <span class="kana-romaji">${item.romaji}</span>
+          `;
+
+          const playCell = () => {
+            document.querySelector(".kana-cell.speaking")?.classList.remove("speaking");
+            button.classList.add("speaking");
+            elements.chartStatus.textContent = `播放：${item.hiragana} / ${item.katakana}（${item.romaji}）`;
+            if (!speakKana(item, () => button.classList.remove("speaking"))) {
+              button.classList.remove("speaking");
+              elements.chartStatus.textContent = "這個瀏覽器不支援語音播放";
+            }
+          };
+
+          button.addEventListener("click", playCell);
+          cell.append(button);
+        }
+        tableRow.append(cell);
+      }
+      body.append(tableRow);
+    }
+    table.append(body);
+    wrapper.append(table);
+    section.append(wrapper);
+    elements.kanaTables.append(section);
+  }
 }
 
 function renderQuestion() {
@@ -241,6 +413,10 @@ function nextQuestion() {
 elements.startButton.addEventListener("click", startQuiz);
 elements.nextButton.addEventListener("click", nextQuestion);
 elements.replayButton.addEventListener("click", speakCurrentAnswer);
+elements.practiceTab.addEventListener("click", () => switchView("practice"));
+elements.chartTab.addEventListener("click", () => switchView("chart"));
+
+renderKanaTables();
 
 if (window.speechSynthesis) {
   loadVoices();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kana-practice-v2";
+const CACHE_NAME = "kana-practice-v35";
 const APP_FILES = [
   "./",
   "./index.html",

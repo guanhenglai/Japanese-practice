@@ -15,12 +15,21 @@
   </head>
   <body>
     <main class="app">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Kana Practice</p>
+          <h1>日語五十音練習</h1>
+        </div>
+        <nav class="view-tabs" aria-label="主要功能" role="tablist">
+          <button id="chartTab" class="view-tab active" type="button" role="tab" aria-selected="true" aria-controls="chartView">五十音表</button>
+          <button id="practiceTab" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="practiceView">練習</button>
+        </nav>
+      </header>
+
+      <div id="practiceView" class="practice-view" role="tabpanel" aria-labelledby="practiceTab" hidden>
       <section class="settings" aria-labelledby="settings-title">
         <div class="title-row">
-          <div>
-            <p class="eyebrow">Kana Practice</p>
-            <h1 id="settings-title">日語五十音練習</h1>
-          </div>
+          <h2 id="settings-title">練習設定</h2>
           <div class="score" aria-live="polite">
             <span id="progressText">0 / 0</span>
             <strong id="scoreText">0%</strong>
@@ -106,6 +115,18 @@
           <p id="feedbackText">開始後會在這裡顯示答題結果。</p>
           <button id="nextButton" class="primary-button" type="button" hidden>下一題</button>
         </div>
+      </section>
+      </div>
+
+      <section id="chartView" class="kana-chart" role="tabpanel" aria-labelledby="chartTab">
+        <div class="chart-heading">
+          <div>
+            <p class="eyebrow">Kana Chart</p>
+            <h2>五十音表</h2>
+          </div>
+          <p id="chartStatus" aria-live="polite">點擊假名即可發音</p>
+        </div>
+        <div id="kanaTables"></div>
       </section>
     </main>
 
