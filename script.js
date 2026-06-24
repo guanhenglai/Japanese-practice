@@ -61,34 +61,27 @@ const chartLayouts = {
       ["n", null, null, null, null]
     ]
   },
-  dakuten: {
-    columns: ["a", "i", "u", "e", "o"],
-    rowLabels: ["g", "z", "d", "b"],
-    rows: [
-      ["ga", "gi", "gu", "ge", "go"],
-      ["za", "ji", "zu", "ze", "zo"],
-      ["da", "ji", "zu", "de", "do"],
-      ["ba", "bi", "bu", "be", "bo"]
-    ]
-  },
-  handakuten: {
-    columns: ["a", "i", "u", "e", "o"],
-    rowLabels: ["p"],
-    rows: [["pa", "pi", "pu", "pe", "po"]]
-  },
   yoon: {
     columns: ["ya", "yu", "yo"],
     rowLabels: ["ky", "sh", "ch", "ny", "hy", "my", "ry", "gy", "j", "by", "py"],
     rows: [
-      ["kya", "kyu", "kyo"], ["sha", "shu", "sho"], ["cha", "chu", "cho"],
-      ["nya", "nyu", "nyo"], ["hya", "hyu", "hyo"], ["mya", "myu", "myo"],
-      ["rya", "ryu", "ryo"], ["gya", "gyu", "gyo"], ["ja", "ju", "jo"],
-      ["bya", "byu", "byo"], ["pya", "pyu", "pyo"]
+      ["kya", "kyu", "kyo"],
+      ["sha", "shu", "sho"],
+      ["cha", "chu", "cho"],
+      ["nya", "nyu", "nyo"],
+      ["hya", "hyu", "hyo"],
+      ["mya", "myu", "myo"],
+      ["rya", "ryu", "ryo"],
+      ["gya", "gyu", "gyo"],
+      ["ja", "ju", "jo"],
+      ["bya", "byu", "byo"],
+      ["pya", "pyu", "pyo"]
     ]
   }
 };
 
 const state = {
+  kanaData,
   questions: [],
   currentIndex: 0,
   correct: 0,
@@ -115,7 +108,8 @@ const elements = {
   practiceView: document.querySelector("#practiceView"),
   chartView: document.querySelector("#chartView"),
   kanaTables: document.querySelector("#kanaTables"),
-  chartStatus: document.querySelector("#chartStatus")
+  chartStatus: document.querySelector("#chartStatus"),
+  audioSourceText: document.querySelector("#audioSourceText")
 };
 
 function getSelectedValue(name) {
@@ -143,7 +137,7 @@ function kanaFor(item, script) {
 
 function buildPool(mode = getSelectedValue("mode")) {
   const categories = getSelectedCategories();
-  const pool = kanaData.filter((item) => categories.includes(item.category));
+  const pool = state.kanaData.filter((item) => categories.includes(item.category));
   if (mode !== "romaji-to-kana") return pool;
 
   const seenRomaji = new Set();
@@ -187,28 +181,46 @@ function updateScore() {
 
 function loadVoices() {
   const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-  state.japaneseVoice = voices.find((voice) => voice.lang === "ja-JP") || voices.find((voice) => voice.lang.startsWith("ja")) || null;
+  state.japaneseVoice =
+    voices.find((voice) => voice.lang === "ja-JP") ||
+    voices.find((voice) => voice.lang.startsWith("ja")) ||
+    null;
 }
 
-function speakKana(item, onEnd) {
+function stopPlayback() {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function updateAudioSourceText(text) {
+  elements.audioSourceText.textContent = `發音來源：${text}`;
+}
+
+function speakWithSystemVoice(item, onEnd) {
   if (!window.speechSynthesis || !item) return false;
-  speechSynthesis.cancel();
+
+  window.speechSynthesis.cancel();
+  updateAudioSourceText("瀏覽器內建語音");
   const utterance = new SpeechSynthesisUtterance(item.hiragana);
   utterance.lang = "ja-JP";
   utterance.rate = 0.82;
   utterance.pitch = 1;
   if (state.japaneseVoice) utterance.voice = state.japaneseVoice;
   if (onEnd) {
-    utterance.addEventListener("end", onEnd);
-    utterance.addEventListener("error", onEnd);
+    utterance.addEventListener("end", onEnd, { once: true });
+    utterance.addEventListener("error", onEnd, { once: true });
   }
-  speechSynthesis.speak(utterance);
+  window.speechSynthesis.speak(utterance);
   return true;
 }
 
 function speakCurrentAnswer() {
-  if (!speakKana(state.currentAnswer)) {
-    elements.feedbackText.textContent += " 這個瀏覽器不支援語音播放。";
+  if (!state.currentAnswer) return;
+
+  if (!speakWithSystemVoice(state.currentAnswer)) {
+    updateAudioSourceText("無法播放");
+    elements.feedbackText.textContent += " 目前裝置無法播放日文發音。";
   }
 }
 
@@ -223,7 +235,7 @@ function switchView(viewName) {
 }
 
 function findChartItem(category, romaji, usedItems) {
-  const item = kanaData.find((candidate) =>
+  const item = state.kanaData.find((candidate) =>
     candidate.category === category &&
     candidate.romaji === romaji &&
     !usedItems.has(candidate)
@@ -233,9 +245,9 @@ function findChartItem(category, romaji, usedItems) {
 }
 
 function renderKanaTables() {
-  for (const [category, layout] of Object.entries(chartLayouts)) {
-    if (category === "dakuten" || category === "handakuten") continue;
+  elements.kanaTables.innerHTML = "";
 
+  for (const [category, layout] of Object.entries(chartLayouts)) {
     const section = document.createElement("section");
     section.className = "kana-section";
 
@@ -248,13 +260,13 @@ function renderKanaTables() {
 
     const table = document.createElement("table");
     table.className = `kana-table${category === "yoon" ? " yoon-table" : ""}`;
-    table.setAttribute("aria-label", `${categoryNames[category]}假名表`);
+    table.setAttribute("aria-label", `${categoryNames[category]}表`);
 
     const header = document.createElement("thead");
     const headerRow = document.createElement("tr");
     const corner = document.createElement("th");
     corner.className = "row-heading";
-    corner.setAttribute("aria-label", "行");
+    corner.setAttribute("aria-label", "列標題");
     headerRow.append(corner);
     for (const column of layout.columns) {
       const cell = document.createElement("th");
@@ -267,19 +279,21 @@ function renderKanaTables() {
 
     const body = document.createElement("tbody");
     const usedItems = new Set();
+
     for (const [rowIndex, row] of layout.rows.entries()) {
       const tableRow = document.createElement("tr");
       const rowCategory = layout.rowCategories?.[rowIndex] || category;
-      const rowLabel = layout.rowLabels[rowIndex];
-      if (rowCategory !== "basic") tableRow.className = `${rowCategory}-row`;
       const rowHeading = document.createElement("th");
       rowHeading.className = "row-heading";
       rowHeading.scope = "row";
-      rowHeading.textContent = rowLabel;
+      rowHeading.textContent = layout.rowLabels[rowIndex];
+      if (rowCategory !== "basic") tableRow.classList.add(`${rowCategory}-row`);
       tableRow.append(rowHeading);
+
       for (const romaji of row) {
         const cell = document.createElement("td");
         const item = romaji ? findChartItem(rowCategory, romaji, usedItems) : null;
+
         if (item) {
           const button = document.createElement("button");
           button.className = "kana-cell";
@@ -293,23 +307,26 @@ function renderKanaTables() {
             <span class="kana-romaji">${item.romaji}</span>
           `;
 
-          const playCell = () => {
+          button.addEventListener("click", () => {
             document.querySelector(".kana-cell.speaking")?.classList.remove("speaking");
             button.classList.add("speaking");
             elements.chartStatus.textContent = `播放：${item.hiragana} / ${item.katakana}（${item.romaji}）`;
-            if (!speakKana(item, () => button.classList.remove("speaking"))) {
+            if (!speakWithSystemVoice(item, () => button.classList.remove("speaking"))) {
               button.classList.remove("speaking");
-              elements.chartStatus.textContent = "這個瀏覽器不支援語音播放";
+              updateAudioSourceText("無法播放");
+              elements.chartStatus.textContent = "目前裝置無法播放日文發音";
             }
-          };
+          });
 
-          button.addEventListener("click", playCell);
           cell.append(button);
         }
+
         tableRow.append(cell);
       }
+
       body.append(tableRow);
     }
+
     table.append(body);
     wrapper.append(table);
     section.append(wrapper);
@@ -332,11 +349,11 @@ function renderQuestion() {
   state.currentDisplay = correctDisplay;
   elements.promptText.textContent = prompt;
   elements.promptText.classList.toggle("romaji", mode === "romaji-to-kana");
-  elements.promptLabel.textContent = mode === "kana-to-romaji" ? "這個假名的發音是？" : "這個發音的日語寫法是？";
-  elements.categoryText.textContent = `${categoryNames[item.category]} · 第 ${state.currentIndex + 1} 題`;
-  elements.feedbackText.textContent = "選出正確答案。";
+  elements.promptLabel.textContent = mode === "kana-to-romaji" ? "請選出對應發音" : "請選出對應日文寫法";
+  elements.categoryText.textContent = `${categoryNames[item.category]} ｜ 第 ${state.currentIndex + 1} 題`;
+  elements.feedbackText.textContent = "請先作答。";
   elements.nextButton.hidden = true;
-  elements.replayButton.disabled = true;
+  elements.replayButton.disabled = !state.currentAnswer;
   elements.options.innerHTML = "";
 
   for (const option of options) {
@@ -349,8 +366,8 @@ function renderQuestion() {
   }
 
   updateScore();
+
   if (mode === "romaji-to-kana") {
-    elements.replayButton.disabled = false;
     speakCurrentAnswer();
   }
 }
@@ -366,14 +383,15 @@ function answerQuestion(button, selectedValue) {
     optionButton.disabled = true;
     if (optionButton.textContent === state.currentDisplay) optionButton.classList.add("correct");
   }
+
   if (!isCorrect) button.classList.add("wrong");
 
   elements.feedbackText.textContent = isCorrect
-    ? `正確：${state.currentAnswer.hiragana} / ${state.currentAnswer.katakana} = ${state.currentAnswer.romaji}`
-    : `答錯了。正確答案：${state.currentDisplay}（${state.currentAnswer.hiragana} / ${state.currentAnswer.katakana} = ${state.currentAnswer.romaji}）`;
+    ? `答對了，${state.currentAnswer.hiragana} / ${state.currentAnswer.katakana} = ${state.currentAnswer.romaji}`
+    : `答錯了，正確答案是 ${state.currentDisplay}，${state.currentAnswer.hiragana} / ${state.currentAnswer.katakana} = ${state.currentAnswer.romaji}`;
   elements.replayButton.disabled = false;
   elements.nextButton.hidden = false;
-  elements.nextButton.textContent = state.currentIndex === state.questions.length - 1 ? "查看結果" : "下一題";
+  elements.nextButton.textContent = state.currentIndex === state.questions.length - 1 ? "完成練習" : "下一題";
   updateScore();
   speakCurrentAnswer();
 }
@@ -381,10 +399,11 @@ function answerQuestion(button, selectedValue) {
 function startQuiz() {
   const pool = buildPool();
   if (pool.length < 4) {
-    elements.feedbackText.textContent = "請至少選擇一個足夠產生選項的題目範圍。";
+    elements.feedbackText.textContent = "目前選擇的範圍不足 4 題，請勾選更多題目範圍。";
     return;
   }
 
+  stopPlayback();
   state.questions = makeQuestions(pool, Number(elements.questionCount.value));
   state.currentIndex = 0;
   state.correct = 0;
@@ -397,12 +416,13 @@ function nextQuestion() {
     const percent = Math.round((state.correct / state.questions.length) * 100);
     elements.promptText.textContent = `${percent}%`;
     elements.promptText.classList.add("romaji");
-    elements.promptLabel.textContent = "本輪正確率";
+    elements.promptLabel.textContent = "本次成績";
     elements.categoryText.textContent = "練習完成";
-    elements.feedbackText.textContent = `答對 ${state.correct} / ${state.questions.length} 題。可以調整設定後重新開始。`;
+    elements.feedbackText.textContent = `你答對了 ${state.correct} / ${state.questions.length} 題，可以重新開始再練一次。`;
     elements.options.innerHTML = "";
     elements.nextButton.hidden = true;
     elements.replayButton.disabled = true;
+    stopPlayback();
     return;
   }
 
@@ -410,21 +430,25 @@ function nextQuestion() {
   renderQuestion();
 }
 
-elements.startButton.addEventListener("click", startQuiz);
-elements.nextButton.addEventListener("click", nextQuestion);
-elements.replayButton.addEventListener("click", speakCurrentAnswer);
-elements.practiceTab.addEventListener("click", () => switchView("practice"));
-elements.chartTab.addEventListener("click", () => switchView("chart"));
+async function initializeApp() {
+  renderKanaTables();
 
-renderKanaTables();
+  if (window.speechSynthesis) {
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+  }
 
-if (window.speechSynthesis) {
-  loadVoices();
-  speechSynthesis.addEventListener("voiceschanged", loadVoices);
+  elements.startButton.addEventListener("click", startQuiz);
+  elements.nextButton.addEventListener("click", nextQuestion);
+  elements.replayButton.addEventListener("click", speakCurrentAnswer);
+  elements.practiceTab.addEventListener("click", () => switchView("practice"));
+  elements.chartTab.addEventListener("click", () => switchView("chart"));
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+    });
+  }
 }
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-  });
-}
+initializeApp();
